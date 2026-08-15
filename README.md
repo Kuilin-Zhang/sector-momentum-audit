@@ -116,6 +116,15 @@ toy functions:
   about this design, not about momentum everywhere.
 - Costs are a flat rate on turnover; no market impact model.
 - Annualized return uses the arithmetic convention (mean × 252).
+- The holdout period (2016–2025) is not epistemically out-of-sample for an
+  author working in 2026: the decay of sector momentum is public knowledge,
+  and a null verdict was plausible ex ante. The contribution of this
+  repository is the mechanism, not the finding.
+- The commit history shows the study was built in a single day. The
+  pre-registration mechanism constrains decision freedom, not construction
+  speed — but a fair reader may still discount a one-day history as a
+  demonstration rather than a habit. The planned v2 protocol (below), with
+  a deliberately delayed holdout, is the answer to that discount.
 
 ## What I would do next
 
