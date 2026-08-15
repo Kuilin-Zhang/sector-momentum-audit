@@ -9,6 +9,12 @@ import pandas as pd
 
 DESIGN_CSV = "data/prices_design.csv"
 
+# The nine-sector universe (PROTOCOL.md Section 2) in fixed ticker order —
+# this order is also the cross-sectional tie-break. SPY is the benchmark
+# factor, never a member of the momentum universe.
+SECTORS = ["XLB", "XLE", "XLF", "XLI", "XLK", "XLP", "XLU", "XLV", "XLY"]
+MARKET = "SPY"
+
 
 def load_prices(csv_path: str = DESIGN_CSV):
     """Load the committed price snapshot and apply the Section 3 data policy.
