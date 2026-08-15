@@ -40,7 +40,11 @@ def main() -> None:
 
     ratio = design.loc[overlap] / raw.loc[overlap]
     rel_var = (ratio.max() - ratio.min()) / ratio.mean()
-    assert (rel_var.abs() < 1e-6).all(), (
+    # Tolerance calibration (NOTES.md, 2026-08-15): Yahoo quote rounding
+    # makes this ratio wobble at ~1e-6 even for same-day fetches (observed
+    # 0.7-1.4e-6); a dividend-sized basis mismatch is ~3e-3. 5e-5 sits 35x
+    # above the noise floor and 60x below the dividend scale.
+    assert (rel_var.abs() < 5e-5).all(), (
         "design/holdout ratio is not constant over the overlap - this is "
         f"not a pure basis rescale; investigate before proceeding:\n{rel_var}"
     )

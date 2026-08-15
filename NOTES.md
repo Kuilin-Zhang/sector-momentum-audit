@@ -40,3 +40,13 @@ all BEFORE any holdout data existed:
 
 Design-period headline numbers unchanged by these fixes
 (median 0.4031 at full precision, champion lb126/s21/k4).
+
+## 2026-08-15 — Amendment: anchor-check tolerance calibration (before any holdout data landed)
+
+First execution of fetch_holdout.py stopped at the overlap-ratio assertion:
+observed per-ticker relative variation 0.7-1.4e-6 against a 1e-6 threshold.
+Diagnosis: Yahoo quote-rounding noise (both snapshots fetched the same day;
+a genuine dividend-basis mismatch would be ~3e-3, three orders larger).
+Threshold recalibrated to 5e-5. No holdout CSV was written and no holdout
+statistic was computed before this change; the design-freeze tag was
+re-pointed to the fix commit prior to publishing the Release.
