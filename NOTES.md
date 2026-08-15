@@ -66,3 +66,12 @@ re-pointed to the fix commit prior to publishing the Release.
     before costs) -> not implementable at 10 bps.
 - No parameter, rule, or grid cell was changed after this run, and none
   will be (PROTOCOL.md Section 11).
+
+## 2026-08-15 — Release ordering note
+
+The design-freeze TAG was pushed to GitHub (server-side timestamp) before
+the holdout was fetched or run; the Release UI entry for that same tag was
+published later the same day. The binding timestamp is the tag push; the
+Release page itself displays "2 commits to main since this release" — the
+holdout commit and the README — making the freeze-then-open ordering
+publicly visible.
