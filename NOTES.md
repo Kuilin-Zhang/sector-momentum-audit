@@ -50,3 +50,19 @@ a genuine dividend-basis mismatch would be ~3e-3, three orders larger).
 Threshold recalibrated to 5e-5. No holdout CSV was written and no holdout
 statistic was computed before this change; the design-freeze tag was
 re-pointed to the fix commit prior to publishing the Release.
+
+## 2026-08-15 — THE holdout run (executed once)
+
+- Code at execution: commit 53fcf7c (= design-freeze tag).
+- data/prices_holdout.csv fetched this day, immediately before the run.
+  Anchor-alignment factors: exactly 1.0 for all ten tickers (same-day
+  fetch as the design snapshot). SHA-256: `520975140269befb64ad8fd9f88994b8850719e3df81f46b8631fac0abf1cb9e`
+  Coverage: 2016-01-04..2025-12-31, 2514 trading days x 10 tickers,
+  0 missing cells, 0 forward-filled.
+- Verdict, per the pre-registered Section 11 rules:
+    primary   : Cannot reject zero alpha. (alpha -1.06%/yr, NW t = -0.479)
+    secondary : does NOT clear EW9 (composite 0.7219 vs EW9 0.7869)
+    falsification: fires. Break-even cost -19.8 bps (alpha negative
+    before costs) -> not implementable at 10 bps.
+- No parameter, rule, or grid cell was changed after this run, and none
+  will be (PROTOCOL.md Section 11).

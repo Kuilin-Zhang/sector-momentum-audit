@@ -1,0 +1,2 @@
+holdout_window,median_net_sharpe_10bps,best_cell_net_sharpe_10bps,composite_net_sharpe_10bps,ew9_net_sharpe_10bps,capm_alpha_ann,capm_beta,newey_west_t_alpha,break_even_cost_bps,design_champion,champion_design_sharpe,champion_holdout_sharpe,primary_verdict,clears_ew9,implementable_at_10bps,cells_forward_filled
+2016-01-04..2025-12-31,0.7086,0.8174,0.7219,0.7869,-0.010648,0.9024,-0.479,-19.83,lb126/s21/k4,0.5346,0.7053,Cannot reject zero alpha.,False,False,0
