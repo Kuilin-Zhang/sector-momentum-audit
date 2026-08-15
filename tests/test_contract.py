@@ -111,14 +111,37 @@ def test_single_rebalance_turnover_in_bounds():
     assert (invested | cash).all()
 
 
-@pytest.mark.skip(reason="Block 3: cost monotonicity")
 def test_net_sharpe_monotone_in_costs():
     """Net Sharpe must be non-increasing as the cost rate rises."""
-    raise NotImplementedError
+    from src.backtest import run_backtest
+    from src.data import SECTORS
+
+    dates, prices, tickers, _ = load_prices()
+    sect = prices[:, [tickers.index(s) for s in SECTORS]]
+
+    sharpes = []
+    for c in [0.0, 10.0, 50.0]:
+        res = run_backtest(sect, dates, 252, 21, 3, c)
+        s0 = res["start_index"]
+        sharpes.append(_sharpe(res["net_returns"][s0 + 1:]))
+    assert sharpes[0] >= sharpes[1] >= sharpes[2]
 
 
-@pytest.mark.skip(reason="Block 3: stats oracle")
 def test_ols_newey_west_match_statsmodels():
-    """Hand-written OLS alpha/beta and NW t agree with statsmodels to
-    1e-8 on random data."""
-    raise NotImplementedError
+    """Hand-written OLS alpha/beta agree with statsmodels to 1e-10, and the
+    Newey-West alpha t-stat to 1e-6 (oracle run with use_correction=False
+    to match our no-small-sample-correction convention)."""
+    import statsmodels.api as sm
+    from src.stats import ols, newey_west_tstat
+
+    rng = np.random.default_rng(7)
+    x = rng.normal(0.0, 0.01, 1500)
+    y = 0.0002 + 0.9 * x + rng.normal(0.0, 0.005, 1500)
+
+    mine = ols(y, x)
+    oracle = sm.OLS(y, sm.add_constant(x)).fit(
+        cov_type="HAC", cov_kwds={"maxlags": 21, "use_correction": False}
+    )
+    assert abs(mine["alpha"] - oracle.params[0]) < 1e-10
+    assert abs(mine["beta"] - oracle.params[1]) < 1e-10
+    assert abs(newey_west_tstat(mine, lag=21) - oracle.tvalues[0]) < 1e-6

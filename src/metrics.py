@@ -11,18 +11,19 @@ import numpy as np
 
 def sharpe(daily_returns: np.ndarray) -> float:
     """PROTOCOL.md Section 7 definition. ddof=1, sqrt(252)."""
-    raise NotImplementedError("Block 3 - you write this")
+    return float(np.mean(daily_returns) / np.std(daily_returns, ddof=1) * np.sqrt(252))
 
 
 def ann_return(daily_returns: np.ndarray) -> float:
-    raise NotImplementedError("Block 3 - you write this")
+    return float(np.mean(daily_returns) * 252)
 
 
 def ann_vol(daily_returns: np.ndarray) -> float:
-    raise NotImplementedError("Block 3 - you write this")
+    return float(np.std(daily_returns, ddof=1) * np.sqrt(252))
 
 
 def max_drawdown(nav: np.ndarray) -> float:
     """Most negative peak-to-trough decline of the NAV path, as a negative
     fraction (e.g. -0.34)."""
-    raise NotImplementedError("Block 3 - you write this")
+    peak = np.maximum.accumulate(nav)
+    return float((nav / peak - 1.0).min())

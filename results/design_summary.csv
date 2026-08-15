@@ -1,0 +1,2 @@
+period,median_net_sharpe_10bps,best_cell_net_sharpe_10bps,champion_cell,composite_net_sharpe_10bps,composite_ann_return_10bps,ew9_net_sharpe_10bps,spy_sharpe,capm_alpha_ann,capm_beta,newey_west_t_alpha,break_even_cost_bps
+design 2001-02-02..2015-12-31 (stats window),0.4032,0.5346,lb126/s21/k4,0.4277,0.078938,0.4182,0.3278,0.024099,0.8398,1.454,75.13
