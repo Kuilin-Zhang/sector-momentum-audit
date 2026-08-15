@@ -53,6 +53,40 @@ def load_prices(csv_path: str = DESIGN_CSV):
     return dates, prices, tickers, int(n_filled)
 
 
+HOLDOUT_CSV = "data/prices_holdout.csv"
+
+
+def load_full(design_csv: str = DESIGN_CSV, holdout_csv: str = HOLDOUT_CSV):
+    """Design + holdout snapshots concatenated, same Section 3 policy.
+
+    Used only by run_holdout.py after the box is opened. The strategy runs
+    continuously from 2000 (Section 3, holdout boundary); the holdout
+    STATISTICS window is selected downstream by date.
+    """
+    a = pd.read_csv(design_csv, index_col=0, parse_dates=True)
+    b = pd.read_csv(holdout_csv, index_col=0, parse_dates=True)
+    df = pd.concat([a, b])
+    assert df.index.is_monotonic_increasing, "snapshots overlap or are out of order"
+    assert df.index.is_unique, "duplicate dates across snapshots"
+
+    df = df.loc[df["SPY"].notna()].copy()
+    n_filled = int(df.isna().sum().sum())
+    df = df.ffill()
+
+    # Splice sanity: both snapshots were fetched with the same adjustment
+    # anchor; the first cross-boundary daily move must therefore be a normal
+    # market move, not an adjustment jump.
+    boundary = df.index.searchsorted(b.index[0])
+    splice_move = df.iloc[boundary].to_numpy() / df.iloc[boundary - 1].to_numpy() - 1.0
+    assert (abs(splice_move) < 0.15).all(), f"splice jump detected: {splice_move}"
+    # Last line of defence only: the real basis check is the overlap-ratio
+    # assertion in fetch_holdout.py, which CAN tell a dividend-sized basis
+    # mismatch from a genuine market move. This one cannot.
+
+    assert int(df.isna().sum().sum()) == 0, "NaNs survived the fill policy"
+    return list(df.index), df.to_numpy(dtype=float), df.columns.tolist(), n_filled
+
+
 if __name__ == "__main__":
     dates, prices, tickers, n_filled = load_prices()
     print("T x N:", prices.shape)

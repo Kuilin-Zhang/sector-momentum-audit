@@ -75,7 +75,11 @@ def _fake_dates(T):
 
 def test_zero_cost_full_hold_equals_ew9():
     """With cost = 0 and top_k = 9, the strategy IS the EW9 benchmark:
-    NAV paths must agree to 1e-10 pointwise from the strategy's start."""
+    NAV paths must agree to 1e-10 pointwise from the strategy's start.
+
+    NOTE: strategy and EW9 share run_with_scores, so this test is blind to
+    any bug common to both. Engine-level correctness is pinned by
+    test_golden_ledger_one_cycle."""
     from src.backtest import run_backtest, ew9_benchmark
     from src.data import SECTORS
 
@@ -125,6 +129,78 @@ def test_net_sharpe_monotone_in_costs():
         s0 = res["start_index"]
         sharpes.append(_sharpe(res["net_returns"][s0 + 1:]))
     assert sharpes[0] >= sharpes[1] >= sharpes[2]
+
+
+def test_golden_ledger_one_cycle():
+    """Hand-computed two-asset ledger pins the engine to the timing
+    contract numerically: entry cost lands the day AFTER execution (Q3),
+    drift follows shares-fixed weights (Section 5), turnover is the
+    half-sum against drifted weights (Q2), bps convert as /1e4."""
+    from src.backtest import month_end_indices, run_with_scores
+
+    dates = list(pd.bdate_range("2020-01-02", periods=60))
+    T = len(dates)
+    prices = np.full((T, 2), 100.0)
+    mes = month_end_indices(dates)
+    m1, m2 = mes[0], mes[1]
+    e1, e2 = m1 + 1, m2 + 1
+    d = e1 + 3                              # doubling day inside the month
+    assert d < m2
+    prices[d:, 0] = 200.0                   # asset 0 doubles at close d
+
+    res = run_with_scores(prices, dates, np.ones((T, 2)), 2, 100.0)  # 100 bps
+    ret, tv = res["net_returns"], res["turnovers"]
+
+    assert len(tv) == 2
+    assert tv[0] == pytest.approx(0.5, abs=1e-15)          # cash -> [.5,.5]
+    assert ret[e1] == pytest.approx(0.0, abs=1e-15)        # old (cash) weights
+    assert ret[e1 + 1] == pytest.approx(-0.005, abs=1e-15)  # 0.5 x 1% cost
+    assert ret[d] == pytest.approx(0.5, abs=1e-15)         # .5*2 + .5*1 - 1
+    assert tv[1] == pytest.approx(1.0 / 6.0, abs=1e-15)    # [2/3,1/3] -> [.5,.5]
+    assert ret[e2 + 1] == pytest.approx(-0.01 / 6.0, abs=1e-15)
+    expected_nav = (1 - 0.005) * 1.5 * (1 - 0.01 / 6.0)
+    assert res["nav"][-1] == pytest.approx(expected_nav, rel=1e-12)
+
+
+def test_net_returns_affine_in_cost_rate():
+    """PROTOCOL Section 11 solves the break-even cost exactly via
+    linearity. This test pins that linearity: the weight/turnover path is
+    cost-independent, and net returns are affine in the cost rate."""
+    from src.backtest import run_backtest
+    from src.data import SECTORS
+
+    dates, prices, tickers, _ = load_prices()
+    sect = prices[:, [tickers.index(s) for s in SECTORS]]
+
+    r0 = run_backtest(sect, dates, 252, 21, 3, 0.0)
+    r10 = run_backtest(sect, dates, 252, 21, 3, 10.0)
+    r50 = run_backtest(sect, dates, 252, 21, 3, 50.0)
+
+    assert r0["turnovers"] == r10["turnovers"] == r50["turnovers"]
+    pred = r0["net_returns"] + 0.2 * (r50["net_returns"] - r0["net_returns"])
+    assert np.max(np.abs(r10["net_returns"] - pred)) < 1e-12
+
+
+def test_composite_window_starts_after_last_cell():
+    """The composite statistics window must begin one day after the LAST
+    cell becomes valid, so no cell contributes cash-zeros to the stats."""
+    from run_all import composite_and_window
+
+    cells = [
+        {"start_index": 5, "net_returns": np.arange(10.0)},
+        {"start_index": 8, "net_returns": np.ones(10)},
+    ]
+    comp, window = composite_and_window(cells)
+    assert window.start == 9
+    assert np.allclose(comp, (np.arange(10.0) + np.ones(10)) / 2.0)
+
+
+def test_select_top_k_tie_break_fixed_order():
+    """Section 4: ties broken by fixed ticker order - deterministically."""
+    from src.backtest import select_top_k
+
+    assert list(select_top_k(np.array([1.0, 1.0, 1.0, 0.0]), 2)) == [0, 1]
+    assert list(select_top_k(np.array([0.0, 2.0, 2.0, 1.0]), 2)) == [1, 2]
 
 
 def test_ols_newey_west_match_statsmodels():

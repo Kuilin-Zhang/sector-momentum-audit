@@ -59,7 +59,10 @@ def run_with_scores(prices: np.ndarray, dates, scores: np.ndarray,
     # with any NaN is not yet valid (all-or-nothing, Section 4): no trade.
     exec_days = {}
     for m in month_end_indices(dates):
-        if m + 1 >= T:
+        # Require the first accrual day m+2 to exist: a trade executed on
+        # the final close would book turnover whose cost could never land
+        # (pending_cost dies with the loop) and earns no PnL anyway.
+        if m + 2 >= T:
             continue
         row = scores[m]
         if np.isnan(row).any():

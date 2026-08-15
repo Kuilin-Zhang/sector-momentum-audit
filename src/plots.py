@@ -28,7 +28,8 @@ def fig_cost_sensitivity(cost_grid, sharpes, break_even, path):
     plt.close(fig)
 
 
-def fig_grid_heatmap(grid, lookbacks, combos, path):
+def fig_grid_heatmap(grid, lookbacks, combos, path,
+                     title="Design-period net Sharpe at 10 bps, all 24 cells (nothing hidden)"):
     """grid: 2-D array (len(lookbacks) x len(combos)) of net Sharpe at
     10 bps; combos are (skip, top_k) column labels."""
     fig, ax = plt.subplots(figsize=(8, 4.5))
@@ -40,7 +41,7 @@ def fig_grid_heatmap(grid, lookbacks, combos, path):
     for i in range(grid.shape[0]):
         for j in range(grid.shape[1]):
             ax.text(j, i, f"{grid[i, j]:.2f}", ha="center", va="center", fontsize=8)
-    ax.set_title("Design-period net Sharpe at 10 bps, all 24 cells (nothing hidden)")
+    ax.set_title(title)
     fig.colorbar(im, ax=ax, shrink=0.8)
     fig.tight_layout()
     fig.savefig(path, dpi=150)

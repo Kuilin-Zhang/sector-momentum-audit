@@ -27,6 +27,18 @@ TOPKS = [2, 3, 4]
 HEADLINE_COST = 10.0
 
 
+def composite_and_window(cells):
+    """Grid composite (PROTOCOL.md Section 11) and its statistics window.
+
+    cells: list of dicts with 'start_index' and 'net_returns'. The window
+    starts one day after the LAST cell becomes valid, so every cell is in
+    the market for every day the statistics cover.
+    """
+    latest = max(c["start_index"] for c in cells)
+    comp = np.mean(np.stack([c["net_returns"] for c in cells]), axis=0)
+    return comp, slice(latest + 1, None)
+
+
 def main() -> None:
     dates, prices, tickers, _ = load_prices()
     sect = prices[:, [tickers.index(s) for s in SECTORS]]
@@ -38,9 +50,8 @@ def main() -> None:
     Path("figures").mkdir(exist_ok=True)
 
     # ------------------------------------------------------------------ grid
-    rows = []
-    cell_returns_10bps = {}
-    latest_start = 0
+    rows = []                       # full precision throughout; CSV is the artifact
+    cells_10bps = []
     for lb in LOOKBACKS:
         for sk in SKIPS:
             for k in TOPKS:
@@ -48,18 +59,24 @@ def main() -> None:
                     res = run_backtest(sect, dates, lb, sk, k, c)
                     s0 = res["start_index"]
                     r = res["net_returns"][s0 + 1:]
+                    reg = ols(r, spy_ret[s0 + 1:])          # per-cell CAPM,
+                    t_a = newey_west_tstat(reg, lag=21)     # descriptive only (S11)
                     rows.append({
                         "lookback": lb, "skip": sk, "top_k": k, "cost_bps": c,
                         "start_date": dates[s0].date(),
-                        "ann_return": round(ann_return(r), 6),
-                        "ann_vol": round(ann_vol(r), 6),
-                        "net_sharpe": round(sharpe(r), 4),
-                        "max_drawdown": round(max_drawdown(res["nav"][s0:]), 4),
-                        "ann_turnover": round(sum(res["turnovers"]) / (len(r) / 252.0), 3),
+                        "ann_return": ann_return(r),
+                        "ann_vol": ann_vol(r),
+                        "net_sharpe": sharpe(r),
+                        "max_drawdown": max_drawdown(res["nav"][s0:]),
+                        "ann_turnover": sum(res["turnovers"]) / (len(r) / 252.0),
+                        "capm_alpha_ann": reg["alpha"] * 252,
+                        "capm_beta": reg["beta"],
+                        "nw_t_alpha": t_a,
                     })
                     if c == HEADLINE_COST:
-                        cell_returns_10bps[(lb, sk, k)] = res["net_returns"]
-                        latest_start = max(latest_start, s0)
+                        cells_10bps.append({"key": (lb, sk, k),
+                                            "start_index": s0,
+                                            "net_returns": res["net_returns"]})
 
     with open("results/grid_design.csv", "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
@@ -67,11 +84,8 @@ def main() -> None:
         writer.writerows(rows)
 
     # --------------------------------------------------- composite + baselines
-    # Grid composite (PROTOCOL.md Section 11): equal-weighted average of the
-    # 24 cells' daily net return series at 10 bps. Cells sit in cash (0.0)
-    # before their signals become valid; stats start once all are valid.
-    composite = np.mean(np.stack(list(cell_returns_10bps.values())), axis=0)
-    window = slice(latest_start + 1, None)
+    composite, window = composite_and_window(cells_10bps)
+    latest_start = window.start - 1
 
     ew9 = ew9_benchmark(sect, dates, HEADLINE_COST)
     ew9_r = ew9["net_returns"]
@@ -82,16 +96,18 @@ def main() -> None:
     t_alpha = newey_west_tstat(reg, lag=21)
 
     # Break-even cost: alpha is linear in c; evaluate at 0 and 50 bps.
-    comp0 = np.mean(np.stack([run_backtest(sect, dates, lb, sk, k, 0.0)["net_returns"]
-                              for (lb, sk, k) in cell_returns_10bps]), axis=0)
-    comp50 = np.mean(np.stack([run_backtest(sect, dates, lb, sk, k, 50.0)["net_returns"]
-                               for (lb, sk, k) in cell_returns_10bps]), axis=0)
-    a0 = ols(comp0[window], spy_ret[window])["alpha"]
-    a50 = ols(comp50[window], spy_ret[window])["alpha"]
+    def composite_at(cost):
+        return np.mean(np.stack(
+            [run_backtest(sect, dates, lb, sk, k, cost)["net_returns"]
+             for (lb, sk, k) in [c["key"] for c in cells_10bps]]), axis=0)
+
+    a0 = ols(composite_at(0.0)[window], spy_ret[window])["alpha"]
+    a50 = ols(composite_at(50.0)[window], spy_ret[window])["alpha"]
     c_star = break_even_cost(a0, a50, 50.0)
 
-    # In-sample champion (Section 3): highest design net Sharpe at 10 bps,
-    # ties broken by smaller lookback, then smaller top_k, then skip=21.
+    # In-sample champion (Section 3): highest design net Sharpe at 10 bps
+    # on FULL-PRECISION values (rounding first could fake a tie), ties
+    # broken by smaller lookback, then smaller top_k, then skip=21.
     ten = [r for r in rows if r["cost_bps"] == HEADLINE_COST]
     champion = sorted(ten, key=lambda r: (-r["net_sharpe"], r["lookback"],
                                           r["top_k"], 0 if r["skip"] == 21 else 1))[0]
@@ -120,11 +136,7 @@ def main() -> None:
     # ------------------------------------------------------------------ plots
     from src.plots import fig_cost_sensitivity, fig_grid_heatmap, fig_nav
 
-    comp_sharpes = []
-    for c in COST_GRID:
-        comp_c = np.mean(np.stack([run_backtest(sect, dates, lb, sk, k, c)["net_returns"]
-                                   for (lb, sk, k) in cell_returns_10bps]), axis=0)
-        comp_sharpes.append(sharpe(comp_c[window]))
+    comp_sharpes = [sharpe(composite_at(c)[window]) for c in COST_GRID]
     fig_cost_sensitivity(COST_GRID, comp_sharpes, c_star, "figures/fig1_cost_sensitivity.png")
 
     combos = [(s, k) for s in SKIPS for k in TOPKS]
