@@ -21,4 +21,11 @@ def momentum_score(prices: np.ndarray, lookback: int, skip: int) -> np.ndarray:
     scores : (T, N) array. Row t holds signal_i(t); rows t < lookback are
              np.nan (signal not yet valid, PROTOCOL.md Section 4).
     """
-    raise NotImplementedError("Block 1 - you write this")
+    T, N = prices.shape
+    scores = np.full((T, N), np.nan)
+    # Derivation (worked out by hand on a T=6, lookback=3, skip=1 example):
+    # as t runs over [lookback, T), the numerator row t-skip sweeps
+    # [lookback-skip, T-skip) and the denominator row t-lookback sweeps
+    # [0, T-lookback). Both slices have length T-lookback.
+    scores[lookback:] = prices[lookback - skip : T - skip] / prices[0 : T - lookback] - 1
+    return scores

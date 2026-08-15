@@ -4,22 +4,35 @@
 # These test the RESEARCH, not toy functions. Every test name states the
 # invariant it defends. All start skipped; each block un-skips its own.
 
+import numpy as np
 import pytest
 
+from src.data import load_prices
+from src.signal import momentum_score
 
-@pytest.mark.skip(reason="Block 1: data layer")
+
 def test_data_contract_shape_and_no_nans():
     """load_prices returns (T,10), no NaNs after the fill policy,
     dates strictly increasing."""
-    raise NotImplementedError
+    dates, prices, tickers, n_filled = load_prices()
+    assert prices.shape == (len(dates), 10)
+    assert len(tickers) == 10
+    assert not np.isnan(prices).any()
+    assert all(dates[i] < dates[i + 1] for i in range(len(dates) - 1))
 
 
-@pytest.mark.skip(reason="Block 1: signal sanity")
 def test_monotone_asset_gets_top_rank():
     """On a synthetic panel where one asset rises every day and the rest
     fall, that asset must hold the top momentum rank once signals are
     valid."""
-    raise NotImplementedError
+    T, N, rising = 300, 4, 2
+    prices = 100.0 * np.cumprod(np.full((T, N), 0.999), axis=0)  # all drift down
+    prices[:, rising] = 100.0 * 1.001 ** np.arange(T)            # one rises daily
+    scores = momentum_score(prices, lookback=63, skip=21)
+    assert np.isnan(scores[:63]).all()          # not yet valid -> NaN
+    assert not np.isnan(scores[63:]).any()      # valid from lookback on
+    winners = np.argmax(scores[63:], axis=1)
+    assert (winners == rising).all()
 
 
 @pytest.mark.skip(reason="Block 2: THE leakage positive control")
